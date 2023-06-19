@@ -1,0 +1,79 @@
+import streamlit as st
+import requests
+import datetime
+
+st.title("""Need to know what the weather is like ANYWHERE IN THE WORLD?""")
+st.header("""Lucky you, you're at the right place!""")
+st.subheader("""Hallo World and Welcome!""")
+
+def check_country_existence(country):
+    url = "https://countriesnow.space/api/v0.1/countries"
+    response = requests.get(url)
+    data = response.json()
+    countries = [country['country'] for country in data['data']]
+    return country in countries
+
+def check_city_existence(city, country):
+    url = "https://countriesnow.space/api/v0.1/countries"
+    response = requests.get(url)
+    data = response.json()
+    for country_data in data['data']:
+        if country_data['country'] == country:
+            cities = [city for city in country_data['cities']]
+            return city in cities
+    return False
+
+def get_weather_data(city):
+    url = f"http://api.openweathermap.org/data/2.5/weather?q={city}&units=metric&lang=de&APPID=62ecb81fe2c18121a5a0c4029bfb3ccb"
+    response = requests.get(url)
+    data = response.json()
+
+    if response.status_code == 200:
+        # Extract the required information from the JSON response
+        temperature = data['main']['temp']  # Convert temperature to Celsius
+        weather_description = data['weather'][0]['description']
+        sunrise = datetime.datetime.fromtimestamp(data['sys']['sunrise']).strftime('%Y-%m-%d %H:%M:%S')
+        sunset = datetime.datetime.fromtimestamp(data['sys']['sunset']).strftime('%Y-%m-%d %H:%M:%S')
+        wind_speed = data['wind']['speed'] * 3.6  # Convert wind speed to km/h
+        cloudiness = data['clouds']['all']
+        last_updated = datetime.datetime.fromtimestamp(data['dt']).strftime('%Y-%m-%d %H:%M:%S')
+
+        # Return the weather data as a dictionary
+        return {
+            'Temperature': temperature,
+            'Weather': weather_description,
+            'Sunrise': sunrise,
+            'Sunset': sunset,
+            'Wind Speed': wind_speed,
+            'Cloudiness': cloudiness,
+            'Last Updated': last_updated
+        }
+    else:
+        return None
+    
+ #------------------------------------------------------   
+
+def main():
+    st.title("Weather App")
+
+    country = st.text_input("Enter a country:")
+    city = st.text_input("Enter a city:")
+
+    if st.button("Click Me"):
+        if not check_country_existence(country):
+            st.error("The specified country does not exist.")
+            return
+        if not check_city_existence(city, country):
+            st.error(f"The city '{city}' does not exist in {country}.")
+            return
+
+        weather_data = get_weather_data(city)
+        if weather_data is not None:
+            st.table(weather_data)
+        else:
+            st.error("Error retrieving weather data.")
+
+if __name__ == "__main__":
+    main()
+
+ #------------------------------------------------------   still missing a map
