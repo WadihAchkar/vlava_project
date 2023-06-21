@@ -1,0 +1,164 @@
+import streamlit as st
+import os
+import json
+import requests
+
+#--------------------------------------------------------------------------------------------
+
+def verify_recaptcha(response):
+    # The actual secret key obtained from the reCAPTCHA service.
+    recaptcha_secret_key = "6Lch6rgmAAAAAIizHYkplIs6A6VNMe5AKp4fwxk_"
+    verification_url = f"https://www.google.com/recaptcha/api/siteverify?secret={recaptcha_secret_key}&response={response}"
+
+    response = requests.get(verification_url)
+    result = response.json()
+
+    return result['success']
+
+#--------------------------------------------------------------------------------------------
+
+# Login page
+def login_page():
+    st.title('Login')
+    
+    # Input fields for username and password
+    username = st.text_input('Username')
+    password = st.text_input('Password', type='password')
+    
+#--------------------------------------------------------------------------------------------
+    # Load reCAPTCHA JavaScript
+    st.markdown('<script src="https://www.google.com/recaptcha/api.js" async defer></script>', unsafe_allow_html=True)
+
+    # reCAPTCHA widget
+    st.markdown("""
+    <div class="g-recaptcha" data-sitekey="6Lch6rgmAAAAAIizHYkplIs6A6VNMe5AKp4fwxk_"></div>
+    """, unsafe_allow_html=True)
+#--------------------------------------------------------------------------------------------
+
+#OLD CODE
+    if st.button('Login without reCAPTCHA protocol'):
+        if authenticate(username, password):
+            # Store the logged-in user in a session state
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.success('Login successful!')
+        else:
+            st.error('Invalid username or password')
+
+#--------------------------------------------------------------------------------------------            
+    if st.button("Login with reCAPTCHA protocol"):
+        # Obtain reCAPTCHA response
+        recaptcha_response = st.text_input("reCAPTCHA Response")
+
+        # Validate reCAPTCHA response
+        is_valid_recaptcha = verify_recaptcha(recaptcha_response)
+
+        if is_valid_recaptcha:
+            # Proceed with login logic
+            if username == "admin" and password == "password":
+                st.success("Login successful! Welcome, Admin.")
+            else:
+                st.error("Invalid username or password.")
+        else:
+            st.error("Invalid reCAPTCHA response. Please try again.")
+#--------------------------------------------------------------------------------------------
+
+# Function to authenticate user login
+def authenticate(username, password):
+    with open('login/login_customer.json') as f: # Den Pfad angeben
+        login_data = json.load(f)
+    if username in login_data and login_data[username] == password:
+        return True
+    return False
+
+# Function to get the list of files in the user's export directory
+def get_export_files(username):
+    export_dir = f'psload/customer/{username}/export' # Den Pfad angeben
+    return os.listdir(export_dir) # alle Einträge im aktuellen Verzeichnis drucken
+
+# Function to download a file
+def download_file(username, filename):
+    export_dir = f'psload/customer/{username}/export' # Den Pfad angeben
+    file_path = os.path.join(export_dir, filename)
+    with open(file_path, 'rb') as f: # "rb" Öffnet die Datei im Binärformat zum Lesen
+        data = f.read()
+    return data
+
+# Function to upload a file
+def upload_file(username, file):
+    import_dir = f'psload/customer/{username}/import' # Den Pfad angeben
+    if not os.path.exists(import_dir):
+        os.makedirs(import_dir)
+    file_path = os.path.join(import_dir, file.name)
+    with open(file_path, 'wb') as f:
+        f.write(file.getbuffer())
+
+# Export tab
+def export_tab():
+    st.title('Export')
+    username = st.session_state.username
+
+    # List of files available for download
+    files = get_export_files(username)
+    st.write('Available files:')
+    for file in files:
+        st.write(file)
+
+    # Button to download a selected file
+    selected_file = st.selectbox('Select file to download', files)
+    if st.button('Download'):
+        file_data = download_file(username, selected_file)
+        st.download_button('Download File', file_data)
+
+# Import tab
+def import_tab():
+    st.title('Import')
+    username = st.session_state.username
+
+    # File upload section
+    st.write('Upload files (max. 5 files)')
+    uploaded_files = st.file_uploader('Choose files', accept_multiple_files=True, key='import_files')
+
+    # Text field for file description
+    description = st.text_area('File description')
+
+    if st.button('Upload'):
+        if uploaded_files:
+            # Limiting the number of files to 5
+            if len(uploaded_files) > 5:
+                st.warning('Maximum 5 files can be uploaded')
+                uploaded_files = uploaded_files[:5]
+            
+            # Upload each file
+            for file in uploaded_files:
+                upload_file(username, file)
+            
+            st.success('Files uploaded successfully!')
+        else:
+            st.warning('No files selected for upload')
+
+# Main application
+def main():
+    st.set_page_config(page_title='File Management App', layout='wide')
+
+    # Check if the user is logged in
+    if 'logged_in' not in st.session_state:
+        st.session_state.logged_in = False
+
+    if not st.session_state.logged_in:
+        login_page()
+    else:
+        st.title('File Management App')
+
+        # Create tabs
+        tabs = ['Export', 'Import']
+        active_tab = st.sidebar.radio('Select an option', tabs)
+
+        if active_tab == 'Export':
+            export_tab()
+        elif active_tab == 'Import':
+            import_tab()
+
+# Run the app
+if __name__ == '__main__':
+    main()
