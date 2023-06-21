@@ -1,10 +1,13 @@
 import streamlit as st
+import pandas as pd
+import folium
+from streamlit_folium import st_folium, folium_static
 import requests
 import datetime
 
 st.title("""Need to know what the weather is like ANYWHERE IN THE WORLD?""")
 st.header("""Lucky you, you're at the right place!""")
-st.subheader("""Hallo World and Welcome!""")
+st.subheader("""Hello World and Welcome!""")
 
 def check_country_existence(country):
     url = "https://countriesnow.space/api/v0.1/countries"
@@ -30,13 +33,15 @@ def get_weather_data(city):
 
     if response.status_code == 200:
         # Extract the required information from the JSON response
-        temperature = data['main']['temp']  # Convert temperature to Celsius
+        temperature = data['main']['temp']
         weather_description = data['weather'][0]['description']
         sunrise = datetime.datetime.fromtimestamp(data['sys']['sunrise']).strftime('%Y-%m-%d %H:%M:%S')
         sunset = datetime.datetime.fromtimestamp(data['sys']['sunset']).strftime('%Y-%m-%d %H:%M:%S')
         wind_speed = data['wind']['speed'] * 3.6  # Convert wind speed to km/h
         cloudiness = data['clouds']['all']
         last_updated = datetime.datetime.fromtimestamp(data['dt']).strftime('%Y-%m-%d %H:%M:%S')
+        lat = data['coord']['lat']
+        lon = data['coord']['lon']
 
         # Return the weather data as a dictionary
         return {
@@ -46,12 +51,14 @@ def get_weather_data(city):
             'Sunset': sunset,
             'Wind Speed': wind_speed,
             'Cloudiness': cloudiness,
-            'Last Updated': last_updated
+            'Last Updated': last_updated,
+            'Latitude': lat, # new section for the map
+            'Longitude': lon
         }
     else:
         return None
     
- #------------------------------------------------------   
+#------------------------------------------------------
 
 def main():
     st.title("Weather App")
@@ -72,8 +79,18 @@ def main():
             st.table(weather_data)
         else:
             st.error("Error retrieving weather data.")
+            
+        if weather_data is not None: # new section for the map
+            # Display the map
+            st.subheader("Location Map")
+            map_zoom = 10
+            weather_map = folium.Map(location=[weather_data['Latitude'], weather_data['Longitude']], zoom_start=map_zoom)
+            folium.Marker([weather_data['Latitude'], weather_data['Longitude']], popup=city).add_to(weather_map)
+            folium_static(weather_map)
+        else:
+            st.error("Error retrieving weather data.")
 
 if __name__ == "__main__":
     main()
 
- #------------------------------------------------------   still missing a map
+#------------------------------------------------------
